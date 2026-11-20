@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Задания с параметром (1–79)</title>
+  <script src="https://telegram.org/js/telegram-web-app.js"></script>
+  <style>
+    :root {
+      --bg: var(--tg-theme-bg-color, #ffffff);
+      --sec-bg: var(--tg-theme-secondary-bg-color, #f2f3f5);
+      --text: var(--tg-theme-text-color, #111111);
+      --hint: var(--tg-theme-hint-color, #707579);
+      --btn: var(--tg-theme-button-color, #2481cc);
+      --btn-text: var(--tg-theme-button-text-color, #ffffff);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 14px;
+      padding-bottom: 36px;
+      line-height: 1.45;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .hidden { display: none !important; }
+
+    .header {
+      margin-bottom: 14px;
+    }
+    .header h1 {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+    .search-input {
+      width: 100%;
+      padding: 10px 12px;
+      border-radius: 10px;
+      border: none;
+      background: var(--sec-bg);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(60px, 1fr));
+      gap: 8px;
+    }
+    .tile {
+      background: var(--sec-bg);
+      color: var(--text);
+      border: none;
+      border-radius: 10px;
+      padding: 14px 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.1s;
+    }
+    .tile:active { transform: scale(0.95); }
+
+    .task-title {
+      font-size: 20px;
+      font-weight: 700;
+      margin-bottom: 10px;
+    }
+    .condition {
+      background: var(--sec-bg);
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      font-size: 15px;
+      white-space: pre-line;
+    }
+    .step-card {
+      background: var(--sec-bg);
+      padding: 12px;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      font-size: 15px;
+      white-space: pre-line;
+      animation: fadeIn 0.2s ease-out;
+    }
+    .step-card.answer {
+      border-left: 4px solid var(--btn);
+      font-weight: 600;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .graph-box {
+      margin: 12px 0;
+    }
+    .graph-box img {
+      width: 100%;
+      border-radius: 12px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 14px;
+    }
+    .btn {
+      width: 100%;
+      padding: 13px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--btn);
+      color: var(--btn-text);
+    }
+    .btn.secondary {
+      background: var(--sec-bg);
+      color: var(--text);
+    }
+    .btn:active { opacity: 0.85; }
+
+    .nav-row {
+      display: flex;
+      gap: 8px;
+    }
+    .nav-row .btn { flex: 1; }
+  </style>
+</head>
+<body>
+
+  <!-- ЭКРАН 1: КАТАЛОГ -->
+  <div id="catalog-view">
+    <div class="header">
+      <h1>📚 Задания с параметром</h1>
+      <input id="search" class="search-input" type="text" placeholder="Поиск по номеру или тексту..." />
+    </div>
+    <div id="grid" class="grid"></div>
+  </div>
+
+  <!-- ЭКРАН 2: ЗАДАНИЕ -->
+  <div id="task-view" class="hidden">
+    <div id="task-title" class="task-title"></div>
+    <div id="task-condition" class="condition"></div>
+    <div id="steps-container"></div>
+    <div id="graph-box" class="graph-box hidden"></div>
+
+    <div class="actions">
+      <button id="btn-next-step" class="btn"></button>
+      <button id="btn-show-all" class="btn secondary">👁 Показать всё решение</button>
+      <button id="btn-graph" class="btn secondary hidden">📈 Показать график</button>
+      <div class="nav-row">
+        <button id="btn-prev-task" class="btn secondary">⏮ Пред.</button>
+        <button id="btn-next-task" class="btn secondary">След. задание ⏭</button>
+      </div>
+      <button id="btn-catalog" class="btn secondary">📚 В каталог</button>
+    </div>
+  </div>
+
+  <script>
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.expand();
+    }
+
+    const haptic = () => tg?.HapticFeedback?.impactOccurred("light");
+
+    let tasks = [];
+    let currentIdx = 0;
+    let shownSteps = 1;
+
+    const catalogView = document.getElementById("catalog-view");
+    const taskView = document.getElementById("task-view");
+    const grid = document.getElementById("grid");
+    const searchInput = document.getElementById("search");
+
+    const elTitle = document.getElementById("task-title");
+    const elCond = document.getElementById("task-condition");
+    const elSteps = document.getElementById("steps-container");
+    const elGraphBox = document.getElementById("graph-box");
+
+    const btnNextStep = document.getElementById("btn-next-step");
+    const btnShowAll = document.getElementById("btn-show-all");
+    const btnGraph = document.getElementById("btn-graph");
+    const btnPrevTask = document.getElementById("btn-prev-task");
+    const btnNextTask = document.getElementById("btn-next-task");
+    const btnCatalog = document.getElementById("btn-catalog");
+
+    function escapeHtml(str) {
+      return str
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+    }
+
+    fetch("tasks.json")
+      .then((r) => r.json())
+      .then((data) => {
+        tasks = data;
+        renderCatalog();
+      })
+      .catch(() => {
+        grid.innerHTML = "<p>Не удалось загрузить tasks.json</p>";
+      });
+
+    function renderCatalog(filter = "") {
+      const q = filter.trim().toLowerCase();
+      grid.innerHTML = "";
+      tasks.forEach((t, idx) => {
+        const match =
+          !q ||
+          String(t.id).includes(q) ||
+          t.condition.join(" ").toLowerCase().includes(q);
+        if (!match) return;
+
+        const btn = document.createElement("button");
+        btn.className = "tile";
+        btn.textContent = `№${t.id}`;
+        btn.onclick = () => openTask(idx);
+        grid.appendChild(btn);
+      });
+    }
+
+    function openCatalog() {
+      haptic();
+      taskView.classList.add("hidden");
+      catalogView.classList.remove("hidden");
+      tg?.BackButton?.hide();
+      window.scrollTo(0, 0);
+    }
+
+    function openTask(idx) {
+      haptic();
+      currentIdx = idx;
+      shownSteps = 1;
+      catalogView.classList.add("hidden");
+      taskView.classList.remove("hidden");
+      elGraphBox.classList.add("hidden");
+      elGraphBox.innerHTML = "";
+      tg?.BackButton?.show();
+      renderTask();
+      window.scrollTo(0, 0);
+    }
+
+    function renderTask() {
+      const t = tasks[currentIdx];
+      elTitle.textContent = `📌 Задание ${t.id}`;
+
+      if (t.condition.length) {
+        elCond.textContent = t.condition.join("\n");
+        elCond.classList.remove("hidden");
+      } else {
+        elCond.classList.add("hidden");
+      }
+
+      elSteps.innerHTML = "";
+      t.steps.slice(0, shownSteps).forEach((stepText) => {
+        const div = document.createElement("div");
+        div.className = "step-card" + (stepText.startsWith("✅") ? " answer" : "");
+        const formatted = escapeHtml(stepText).replace(
+          /^(Шаг\s+\d+\.?)/,
+          "<strong>$1</strong>"
+        );
+        div.innerHTML = formatted;
+        elSteps.appendChild(div);
+      });
+
+      const total = t.steps.length;
+      if (shownSteps < total) {
+        const isLastAnswer = shownSteps === total - 1 && t.steps[total - 1].startsWith("✅");
+        btnNextStep.textContent = isLastAnswer
+          ? "✅ Показать ответ"
+          : `➡️ Следующий шаг (${shownSteps + 1}/${total})`;
+        btnNextStep.classList.remove("hidden");
+        btnShowAll.classList.toggle("hidden", total - shownSteps <= 1);
+      } else {
+        btnNextStep.classList.add("hidden");
+        btnShowAll.classList.add("hidden");
+      }
+
+      if (t.images.length) {
+        btnGraph.classList.remove("hidden");
+        btnGraph.textContent = elGraphBox.classList.contains("hidden")
+          ? "📈 Показать график"
+          : "🙈 Скрыть график";
+      } else {
+        btnGraph.classList.add("hidden");
+      }
+
+      btnPrevTask.disabled = currentIdx === 0;
+      btnPrevTask.style.opacity = currentIdx === 0 ? "0.4" : "1";
+      btnNextTask.disabled = currentIdx === tasks.length - 1;
+      btnNextTask.style.opacity = currentIdx === tasks.length - 1 ? "0.4" : "1";
+    }
+
+    searchInput.addEventListener("input", (e) => renderCatalog(e.target.value));
+
+    btnNextStep.onclick = () => {
+      haptic();
+      shownSteps++;
+      renderTask();
+      elSteps.lastElementChild?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    };
+
+    btnShowAll.onclick = () => {
+      haptic();
+      shownSteps = tasks[currentIdx].steps.length;
+      renderTask();
+    };
+
+    btnGraph.onclick = () => {
+      haptic();
+      const t = tasks[currentIdx];
+      if (elGraphBox.classList.contains("hidden")) {
+        elGraphBox.innerHTML = t.images
+          .map((src) => `<img src="${src}" alt="График к заданию ${t.id}" />`)
+          .join("");
+        elGraphBox.classList.remove("hidden");
+      } else {
+        elGraphBox.classList.add("hidden");
+      }
+      renderTask();
+    };
+
+    btnPrevTask.onclick = () => {
+      if (currentIdx > 0) openTask(currentIdx - 1);
+    };
+    btnNextTask.onclick = () => {
+      if (currentIdx < tasks.length - 1) openTask(currentIdx + 1);
+    };
+    btnCatalog.onclick = openCatalog;
+
+    if (tg?.BackButton) {
+      tg.BackButton.onClick(openCatalog);
+    }
+  </script>
+</body>
+</html>
